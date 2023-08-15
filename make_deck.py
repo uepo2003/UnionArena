@@ -33,6 +33,7 @@ decks = [
                 f.write(","+line)
         f.write("]")
 
+
 if __name__ == "__main__":
     add_decks(pack_deck([[JJK043,10],[JJK036,10],[JJK038,10]]))
     add_decks(pack_deck([[JJK001,10],[JJK006,10],[JJK024,10]]))
