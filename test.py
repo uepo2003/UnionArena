@@ -2,4 +2,9 @@
 from ginfo import *
 from copy import *
 
-JJK036.use
+def test():
+    while True:
+        return "A"
+        
+
+print(test())
