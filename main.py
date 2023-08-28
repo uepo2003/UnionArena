@@ -2,10 +2,12 @@ from ginfo import *
 from deck_list import decks
 from random import *
 from log_class import GameLog
+from display import *
 #ゲームボードの作成
-def make_bord(player1_deck,player2_deck):
-    player1_info = {"deck":player1_deck,
-                    "front_line":[JJK006,JJK037,JJK036,None],
+def make_bord(p1_name,player1_deck,p2_name,player2_deck):
+    player1_info = {"player_name":p1_name,
+                    "deck":player1_deck,
+                    "front_line":[None,None,None,None],
                     "energy_line":[None,None,None,None],
                     "life":[],
                     "hand":[],
@@ -14,8 +16,9 @@ def make_bord(player1_deck,player2_deck):
                     "observe":[],
                     "action_point":0}
 
-    player2_info = {"deck":player2_deck,
-                    "front_line":[JJK001,JJK016,None,None],
+    player2_info = {"player_name":p2_name,
+                    "deck":player2_deck,
+                    "front_line":[None,None,None,None],
                     "energy_line":[None,None,None,None],
                     "life":[],
                     "hand":[],
@@ -37,36 +40,38 @@ def monitoring(log,log_observer):
 #手札とライフの用意
 ##どう考えてもこれとゲームボードの作成の処理くっつけたほうが軽くなるなぁ
 def standby(info):
-    print("バトルの準備をします。")
+    #タイトルコール
+    print(f"\n{split_turn}")
+    print(f"{info['player_name']}のバトルの準備を開始します。")
     #手札の設定
     shuffle(info["deck"])
     for _ in range(7):
         info["hand"].append(info["deck"].pop())
-    
-    print(f"\n手札です\n{[i.No for i in info['hand']]}")
-    
+    #手札の表示
+    print(f"\n手札\n{[i.No for i in info['hand']]}")
     #マリガン機能
     ##ここの処理軽くできる可能性あり
-    if input("\nマリガンしますか？。0か1で入力してください") == "1":
-        
+    if input("\nマリガンしますか？。0か1で入力してください:") == "1":
         for _ in range(7):
             info["deck"].insert(0,info["hand"].pop())
         for _ in range(7):
             info["hand"].append(info["deck"].pop())
         shuffle(info["deck"])
-        print("マリガンしました")
-        print(f"手札です\n{[i.No for i in info['hand']]}")
-    input("\nキーを入力してください")
+        #手札の表示
+        print(f"\nマリガン後の手札\n{[i.No for i in info['hand']]}")
     #ライフの設定
     for _ in range(7):
         info["life"].append(info["deck"].pop())
-    
+    #終了処理
+    input("\n準備を終了します。キーを入力してください:")    
     return info   
  
 
 #スタートフェイズ
 def start_phaze(info,first,turn):
-    print("スタートフェイズ！")
+    #タイトルコール
+    print(f"{split_faze}\n")
+    print("<スタートフェイズ！>")
     #リフレッシュステップ
     for front_char in info["front_line"]:
         if front_char != None and front_char.active == False:
@@ -74,7 +79,6 @@ def start_phaze(info,first,turn):
     for energy_char in info["energy_line"]:
         if energy_char != None and energy_char.active == False:
             energy_char.active = True
-    
     #アクションポイントの設定
     if first == "先行":
         if turn == 1:
@@ -83,328 +87,350 @@ def start_phaze(info,first,turn):
             info["action_point"] = 2
         else:
             info["action_point"] = 3
-    
     elif first == "後攻":
         if turn <= 2:
             info["action_point"] = 2
         else:
             info["action_point"] = 3 
-
     #ドロー処理
-    ##GUI作成時にはここで一度引いたカードを表示する機能を追加するのもいいかも
     if first == "先行" and turn == 1:
         pass
     else:
         info["hand"].append(info["deck"].pop())
         print(f'ドローしたカード:{info["hand"][-1].No}')
-
     #エクストラドロー
-    ##一枚目のカードを見せてからex_drawをするかどうか選択させる
+    ##一枚目のカードを見せてからエクストラドローをするかどうか選択させる
     print(f"手札:{[i.No for i in info['hand']]}")
-    if input("エクストラドローしますか？。1か0で入力してください") == "1":
+    if input("\nエクストラドローしますか？。0か1で入力してください:") == "1":
         info["action_point"] -= 1
         info["hand"].append(info["deck"].pop())
         print(f"ドローしたカード:{info['hand'][-1].No}")
     
+    input("スタートフェイズを終了します。キーを入力してください")
     return info
 
+#移動フェイズ
 def move_faze(info):
-    print("移動フェイズ！")
-    while True:
-        print(split_gui)
-        print(f"""
-front_line
-{[i if i == None else i.No for i in info["front_line"]]}
-
-energy_line
-{[i if i == None else i.No for i in info["energy_line"]]}
-              """)
-
-        print("0.移動フェイズを終わる 1.移動させるキャラクターを選択する")
-        num = int(input("0か1で選択してください"))
+    #タイトルコール
+    print(f"{split_faze}\n")
+    print("<移動フェイズ！>")
+    #メニュー選択ループ
+    while True: 
+        print(f"""\n{split_pop}
+{[[index,i] if i == None else [index,i.No] for index,i in enumerate(ally_info["front_line"])]} 
+            
+{[[index,i] if i == None else [index,i.No] for index,i in enumerate(ally_info["energy_line"])]}
+{split_pop}""")              
+        #移動フェイズ行動選択
+        print("\n[0.移動フェイズを終わる 1.移動させるキャラクターを選択する]")
+        num = int(input("0か1で選択してください:"))
+        #行動分岐
+        #移動フェイズ終了処理
         if num == 0:
-            input("移動フェイズを終了します。キーを入力してください")
+            input("\n移動フェイズを終了します。キーを入力してください")
             break
+        #移動処理
         if num == 1:
-            print("移動させたいカードの座標を確認します。")
-            target_line = input("ラインを入力してください")
-            target_index = int(input("インデックス番号を入力してください"))
+            #座標を確認
+            print("\n移動させたいカードの座標を確認します。")
+            target_line, target_index = get_point()
+            #Noneじゃないかどうか確認
             if info[target_line][target_index] == None:
                 print("移動対象を確認できなかったため移動をキャンセルします。")
                 continue
+            #座標を確認
             print("移動先の座標を確認します。")
-            move_line = input("ラインを入力してください")
-            move_index = int(input("インデックス番号を入力してください"))
+            move_line, move_index = get_point()
+            #移動用関数の実行
             move_char(info,target_line,target_index,move_line,move_index)
+
     return info
         
-
-
-#新生移動フェイズ
+#移動用関数
 def move_char(info,target_line,target_index,move_line,move_index):
+    #該当座標のキャラクターを取得
     target_char = info[target_line][target_index]
     move_char = info[move_line][move_index]
-
+    #一定の条件化における移動不可を判定
+    #フィールドカードがフロントラインに移動しようとした時
     if target_char.type == "field" and move_line == "front_line":
         print("フィールドカードはフロントラインに移動できません。")
         return info
+    #ステップをもたないカードがエナジーラインに移動しようとした時
     elif not (target_line == "front_line" and target_char.step) and move_line == "energy_line":
         print("ステップを持っていないフロントラインのキャラクターはエナジーラインに移動できません。")
         return info
-    
+    #カードが既に配置されている時
     elif not move_char == None:
-        choice = input("移動先に他のカードがあります。リムーブしますか？0か1で入力してください")
+        #リムーブするかどうか確認を入れる
+        choice = input("移動先に他のカードがあります。リムーブしますか？0か1で入力してください:")
+        #リムーブしない場合。座標の入れ替えを行う。
         if choice == "0":
+            #結果としてフロントラインのカードがエナジーラインに移動してしまう場合の例外処理
             if  not (move_line == "front_line" and move_char.step) and target_line == "energy_line":
                 print("ステップを持っていないフロントラインのキャラクターはエナジーラインに移動できません。")
                 return info
+            #座標の入れ替え処理
             else:
                 print("移動先のカードと場所を入れ替えます。")
                 info[target_line][target_index] = move_char
                 info[move_line][move_index] = target_char
                 return info
-        
+        #リムーブする場合
         elif choice == "1":
-            print("リムーブしました。")
             info["remove"].appned(move_char)
-    
-    print("移動が完了しました。")
+            print("リムーブしました。")
+    #原則処理
     info[move_line][move_index] = target_char
     info[target_line][target_index] = None
+    print("移動が完了しました。")
+
     return info
 
 
 #メインステップ
 def main_faze(ally_info,enemy_info):
-    print("メインステップ！")
+    #タイトルコール
+    print(f"{split_faze}\n")
+    print("<メインステップ！>")
+    #メニュー制御ループ
     while True:
-        print(split_gui)
-        print("0.メインステップを終了する 1.手札からカードを使用する 2.起動メインを使う 3.盤面を確認する 4.墓地を確認する 5.リムーブエリアを確認する" )
-        num = int(input("0~2で入力してください。"))
-
+        #盤面の表示
+        display_info(ally_info,enemy_info)
+        #メインステップ行動選択
+        print("\n[0.メインステップを終了する 1.手札からカードを使用する 2.起動メインを使う 3.墓地を確認する 4.リムーブエリアを確認する 5.相手の情報を確認する]" )
+        num = int(input("0~5で入力してください:"))
+        #選択分岐
+        #終了処理
         if num == 0:
-            print("メインステップを終了します。")
+            input("\nメインステップを終了します。キーを入力してください")
             break
-        if num == 1:
-            print(f"手札:{[[index,i.No] for index,i in enumerate(ally_info['hand'])]}")
-            num_1 = int(input("使用したいカードのインデックス番号を入力してください。"))
+        #手札からカードを使用
+        elif num == 1:
+            #手札の一覧を表示→選ばれたカードを取得
+            print(f"\n手札:{[[index,i.No] for index,i in enumerate(ally_info['hand'])]}")
+            num_1 = int(input("使用したいカードのインデックス番号を入力してください:"))
             card = ally_info["hand"][num_1]
+            #カード使用時の関数を実行
             ally_info, enemy_info = use_card(ally_info,enemy_info,card,num_1)
-        if num == 2:
+        #場のカードの起動メインを実行
+        elif num == 2:
             print("起動メインを使用したいカードの座標を確認します。")
-            line = input("対象のラインを入力してください")
-            index = int(input("対象のインデックス番号を入力してください"))
+            #対象の座標を取得
+            line, index = get_point()
             target_card = ally_info[line][index]
-            if target_card.main_effect == []:
-                print("対象は起動メインを持っていません")
+            #対象がない場合キャンセルを行う
+            if target_card == None:
+                print("対象が確認できません。キャンセルします。")
+                return ally_info, enemy_info
+            #対象の起動メインの数で分岐
+            #0個の場合
+            if target_card.EF == []:
+                print("対象は起動メインを持っていません。")
                 continue
-            elif len(target_card.main_effect) == 1:
+            #1個の場合
+            elif len(target_card.main_EF) == 1:
                 ally_info, enemy_info = boot_main(ally_info,enemy_info,line,index,0)
+            #複数個ある場合
             else:
-                print(f"起動メイン:{[[m_index,i] for m_index,i in enumerate(target_card.main_effect)]}")
-                main_index = int(input("どの起動メインを使用するかインデックス番号で入力してください"))
+                #起動メインの一覧を表示し、選択させる
+                print(f"起動メインの一覧:{[[m_index,i] for m_index,i in enumerate(target_card.main_EF)]}")
+                main_index = int(input("どの起動メインを使用するかインデックス番号で入力してください:"))
                 ally_info, enemy_info = boot_main(ally_info,enemy_info,line,index,main_index)
-        if num == 3:
-            display_info(ally_info,enemy_info)
-        if num == 4:
+        #トラッシュのカード一覧
+        elif num == 3:
             display_trash(ally_info)
-        if num == 5:
+        #リムーブエリアのカード一覧
+        elif num == 4:
             display_remove(ally_info)
-
+        #相手の情報
+        elif num == 5:
+            display_enemy(enemy_info)
+    
     return ally_info, enemy_info
-        
+
 #手札からカードを使用する
 def use_card(ally_info,enemy_info,card,card_num):
+    #コストを満たしているかどうか判定
     all_energy = sum([0 if char == None else char.out_E for char in ally_info["energy_line"]])
     AP = ally_info["action_point"]
-
     if not (card.summon_AP <= AP and card.summon_E <= all_energy):
-        print("必要コストを満たしていません")
+        #偽の場合召喚をキャンセル
+        print("必要コストを満たしていません。召喚をキャンセルします。")
         return ally_info,enemy_info
-    
+    #カードタイプ毎に処理を分ける
+    #キャラクターカードの場合
     if card.type == "char":
-        line = input("召喚するラインを入力してください")
-        index = int(input("召喚するインデックス番号を入力してください"))
+        #召喚先の座標を取得
+        print("召喚先の座標を確認します。")
+        line,index = get_point()
+        #例外処理
+        #召喚先にカードが有る場合リムーブの確認を行う
         if not ally_info[line][index] == None:
-            choice = input("召喚先にカードがあります。リムーブしますか？0か1で入力してください")
+            choice = input("召喚先にカードがあります。リムーブしますか？0か1で入力してください:")
+            #リムーブしない場合
             if choice == "0":
+                print("召喚をキャンセルします。")
                 return ally_info,enemy_info
+            #リムーブする場合
             elif choice == "1":
                 ally_info["remove"].append(ally_info[line][index])
-                ally_info[line][index] = None  
+                ally_info[line][index] = None
+                print("リムーブしました。")
+        #原則処理
         ally_info, enemy_info = card.use(ally_info,enemy_info,card_num,line,index)
-
+    #フィールドカードの場合
     elif card.type == "field":
-        index = int(input("召喚するインデックス番号を入力してください"))
+        #座標の取得
+        print("召喚先の座標を確認します。")
+        index = int(input("インデックス番号を入力してください:"))
+        #例外処理
+        #召喚先にカードが有る場合リムーブ処理をおこなう
         if not ally_info["energy_line"][index] == None:
             choice = input("召喚先にカードがあります。リムーブしますか？0か1で入力してください")
+            #リムーブしない場合
             if choice == "0":
+                print("召喚をキャンセルします。")
                 return ally_info,enemy_info
+            #リムーブする場合
             elif choice == "1":
                 ally_info["remove"].append(ally_info[line][index])
                 ally_info[line][index] = None 
+                print("リムーブしました。")
+        #原則処理
         ally_info, enemy_info = card.use(ally_info,enemy_info,card,card_num,index)
-
+    #イベントカードの場合
     elif card.type == "event":
+        #原則処理
         ally_info, enemy_info = card.use(ally_info,enemy_info,card,card_num)
     
     return ally_info, enemy_info
 
-
 #起動メインを使う
 def boot_main(ally_info,enemy_info,target_line,target_index,main_index):
-    ally_info, enemy_info = ally_info[target_line][target_index].main_effect[main_index][1](ally_info,enemy_info)
-    ally_info[target_line][target_index].main_effect[main_index][0] += 1
+    ally_info, enemy_info = ally_info[target_line][target_index].EF[main_index][1](ally_info,enemy_info)
+    ally_info[target_line][target_index].EF[main_index][0] += 1
+
     return ally_info,enemy_info
 
 
 #アタックフェイズ
 def attack_faze(ally_info,enemy_info):
-    print("アタックフェイズ！")
-    
+    print(f"{split_faze}\n")
+    print("<アタックフェイズ！>")
+    #アタック可能なキャラクターがいるか確認＆いる限りループ
     while len([C for C in ally_info["front_line"] if not (C == None) and C.active == True]) > 0:
-        print(split_gui)
-        print("フロントライン")
-        for element in ([index,char] if char == None else [index, char.No, char.active] for index, char in enumerate(ally_info["front_line"])):
-            print(element,end=" ")
-        print("\n0.アタックフェイズを終了する 1.アタックを行う")
-        num = int(input("\n0か1で入力してください。"))
-        
+        #盤面の表示
+        display_bord(ally_info,enemy_info)
+        #選択肢の表示
+        print("\n[0.アタックフェイズを終了する 1.アタックを行う]")
+        num = int(input("0か1で入力してください:"))
+        #選択分岐
+        #終了処理
         if num == 0:
-            break
+            input("アタックフェイズを終了します。キーを入力して下さい")
+            return ally_info, enemy_info
+        #アタック処理
         elif num == 1:
-            num1 = int(input("アタックしたいキャラクターのインデックス番号を入力してください"))
+            #座標取得
+            num1 = int(input("アタックしたいキャラクターのインデックス番号を入力してください:"))
+            #例外処理
+            #キャタクターがいない場合
             if ally_info["front_line"][num1] == None:
-                print("座標にキャラクターが存在しません。")
+                print("キャラクターを確認できません。キャンセルします。")
                 continue
+            #対象のキャラクターがレストの場合
             elif not(ally_info["front_line"][num1].active):
-                print("レストではアタックできません。")
+                print("レストではアタックできません。キャンセルします。")
                 continue
+            #原則処理
             else:
                 ally_info, enemy_info = ally_info["front_line"][num1].attack(ally_info,enemy_info,num1)
+    #アタック可能なキャラクターがいない場合の処理
+    input("アタック可能なキャラクターが存在しません。アタックフェイズを終了します。キーを入力してください")
 
-
-    input("アタックフェイズを終了します。キーを入力してください")
     return ally_info,enemy_info
     
 
 #エンドフェイズ
 def end_faze(info):
+    #タイトルコール
+    print(f"{split_faze}\n")
+    print("エンドフェイズ！")
+    #リフレッシュステップ
     for front_char in info["front_line"]:
         if front_char != None and front_char.active == False:
             front_char.active = True
-
+            #同時に起動メインの使用回数をリセット
             for effect in front_char.main_effect:
                 effect[0] = 0
-    
     for energy_char in info["energy_line"]:
         if energy_char != None and energy_char.active == False:
             energy_char.active = True
-
+            #同上
             for effect in energy_char.main_effect:
                 effect[0] = 0
-    
+    #手札が上限を超えている場合の処理
+    #リムーブするカードを選択させて8枚以下になるまでループ
     while len(info["hand"]) > 9:
-        print("手札が8枚を超えています。リムーブエリアに移動するカードを選んでください")
-        for index,card in enumerate(info["hand"]):
-            print(f"{index}. {card.No} ",end="")
-        
-        num = int(input("インデックス番号で入力してください"))
+        print("\n手札が8枚を超えています。リムーブするカードを選んでください。")
+        print([[index,i.No] for index, i in info["hand"]])
+        num = int(input("インデックス番号を入力してください:"))
         info["remove"].append(info["hand"].pop(num))
-
-
-def display_info(ally_info,enemy_info):
-    print(f"""{split_gui}
-{[i if i == None else i.No for i in enemy_info["energy_line"]]}  
-      
-{[i if i == None else i.No for i in enemy_info["front_line"]]}  
-enemy
-------------------------------------------------------
-ally              
-{[i if i == None else i.No for i in ally_info["front_line"]]} 
-            
-{[i if i == None else i.No for i in ally_info["energy_line"]]}
-
-hand               
-{[i.No for i in ally_info["hand"]]}    
-
-AP:{ally_info["action_point"]}
-life:{len(ally_info["life"])}
-
-{split_gui}""")
-
     
-def display_trash(info):
-    print(f"""
+    input("\nエンドフェイズを終了します。キーを入力して下さい")
+    return info
 
-trash:{[i.No for i in info["trash"]]}
 
-""")
+#選択したいカードの座標を入力要求する関数
+def get_point():
+    num = int(input("エナジーラインの場合は0を、フロントラインの場合は1を選択してください:"))
+    line = "energy_line" if num == 0 else "front_line"
+    index = int(input("インデックス番号を入力してください:"))
+    return line,index
     
-def display_remove(info):
-    print(f"""
-
-remove:{[i.No for i in info["remove"]]}
-
-""")
-
 
 
 #完成までは関数のテストに使用
 if __name__ == "__main__":
-    p1_info, p2_info= make_bord(decks[0],decks[1])
+    #ゲームボードの作成
+    p1_info, p2_info= make_bord("Sitrus",decks[0],"Noel",decks[1])
+    #ターン数の制御変数を定義
     turn_num = 0
     counter = 0
-    ally_info = p2_info
-    enemy_info = p1_info
-    split_turn = "============================================================"
-    split_gui = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
+    #勝利判定
     winner = None 
     loser = None
-
-    print(split_turn)
-    print("p1の準備です。")
-    standby(p1_info)
-    print(split_turn)
-    print("p2の準備です。")
-    standby(p2_info)
-    print(split_turn)
-
+    #バトル準備
+    p1_info = standby(p1_info)
+    p2_info = standby(p2_info)
+    ##ゲーム開始時に先行後攻を入れ替えてしまうのでallyとenemyに逆のプレイヤー情報を代入することに注意
+    #後攻のプレイヤー
+    ally_info = p2_info
+    #先行のプレイヤー
+    enemy_info = p1_info
+    #試合開始
     print(f"\n<ゲームを開始します！！>\n")
-    
+    #メインループ
     while True:
-        print(split_turn)
+        #ターン開始宣言
+        print(f"\n{split_turn}")
+        #ターン数＆先行後攻制御
         counter += 1
         if counter % 2 == 0:
             first = "後攻"
-            print(f"{first}{turn_num}ターン目！\n")
+            print(f"{first}{turn_num}ターン目！")
         else:
             turn_num += 1
             first = "先行"
-            print(f"{first}{turn_num}ターン目！\n")
-        
+            print(f"{first}{turn_num}ターン目！")
+        #先行後攻の入れ替え
         temp = ally_info 
         ally_info = enemy_info
         enemy_info = temp
-
+        #各フェイズの実行関数
         ally_info = start_phaze(ally_info,first,turn_num)
         ally_info = move_faze(ally_info)
         ally_info, enemy_info = main_faze(ally_info,enemy_info)
         ally_info, enemy_info = attack_faze(ally_info,enemy_info)
         ally_info = end_faze(ally_info)
-
-
-
-
-
-
-
-
-
-    
-    
-
-
-#テスト用コピペ
-#    print([i.No for i in info["hand"]])
-#    print([i.No for i in info["deck"]])
