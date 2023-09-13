@@ -1,18 +1,33 @@
-from main import *
+from func_display import *
+import datetime
+import json
+from copy import *
 
-class Cards:
-    def __init__(self, No, image, name, color, summon_E, summon_AP, trigger_EF, hand_never_EF):
-        self.No = No
-        self.image = image
-        self.name = name
-        self.color = color
-        self.summon_E = summon_E
-        self.summon_AP = summon_AP
-        self.trigger_EF = trigger_EF
-        self.hand_never_EF = hand_never_EF
 
-#キャラクターカードステータス
-class Character(Cards):
+#ゲームログクラス
+class GameLog:
+    def __init__(self):
+        self.logs = []
+        
+    def add_log(self, player_name, card_used, turn_number):
+        log_entry = {
+            "player_name": player_name,
+            "card_used": card_used,
+            "turn_number": turn_number,
+            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        self.logs.append(log_entry)
+    
+    def save_to_file(self, filename="game_logs.json"):
+        with open(filename, "w") as file:
+            json.dump(self.logs, file, indent=4)
+
+    def load_from_file(self, filename="game_logs.json"):
+        with open(filename, "r") as file:
+            self.logs = json.load(file)
+
+#キャラクターカードクラス
+class Character:
     def __init__(self, 
                  #基礎ステータス(入力必須)
                  No,
@@ -29,6 +44,7 @@ class Character(Cards):
                  out_E=1, 
                  attribute=[],  
                  damage=1, 
+                 under_card = [],
                  
                  #キーワード効果
                  impact=0, 
@@ -45,7 +61,14 @@ class Character(Cards):
                  void_EF=[], 
                  line_never_EF=[]):
         
-        super().__init__(No, image, name, color, summon_E, summon_AP, trigger_EF, hand_never_EF)
+        self.No = No
+        self.image = image
+        self.name = name
+        self.color = color
+        self.summon_E = summon_E
+        self.summon_AP = summon_AP
+        self.trigger_EF = trigger_EF
+        self.hand_never_EF = hand_never_EF
         self.type = type
         self.BP = BP
         self.out_E = out_E
@@ -61,9 +84,38 @@ class Character(Cards):
         self.block_EF = block_EF
         self.void_EF = void_EF
         self.line_never_EF = line_never_EF
+        self.under_card = under_card
 
+    def __repr__(self):
+        return (f"Card("
+                f"No={self.No}, "
+                f"image={repr(self.image)}, "
+                f"name={repr(self.name)}, "
+                f"color={repr(self.color)}, "
+                f"summon_E={self.summon_E}, "
+                f"BP={self.BP}, "
+                f"type={repr(self.type)}, "
+                f"active={self.active}, "
+                f"summon_AP={self.summon_AP}, "
+                f"out_E={self.out_E}, "
+                f"attribute={self.attribute}, "
+                f"damage={self.damage}, "
+                f"impact={self.impact}, "
+                f"unimpact={self.unimpact}, "
+                f"step={self.step}, "
+                f"trigger_EF={self.trigger_EF}, "
+                f"hand_never_EF={self.hand_never_EF}, "
+                f"append_EF={self.append_EF}, "
+                f"main_EF={self.main_EF}, "
+                f"attack_EF={self.attack_EF}, "
+                f"block_EF={self.block_EF}, "
+                f"void_EF={self.void_EF}, "
+                f"line_never_EF={self.line_never_EF})"
+                )
+
+        
     #カード使用の処理
-    def use(self,ally_info,enemy_info,char_num,des_line,des_index):
+    def summon(self,ally_info,enemy_info,char_num,des_line,des_index):
         print(f"{self.name}を召喚！")
         #手札から該当のカードを削除＆場に召喚
         ally_info[des_line][des_index] = ally_info["hand"].pop(char_num)
@@ -174,7 +226,7 @@ class Character(Cards):
             print(f"削るライフの場所を0~{num_of_life-1}で選択してください⚠二回目以降は重複する数字を避けてください")
             broken_life.append(enemy_info["life"].pop(int(input(":"))))
         #broken_lifeを公開することで削られた全てのカードを同時に公開
-        print("\n削られたライフを公開します")
+        print("\n削られたライフを公開します。")
         print([i.No for i in broken_life])
         #トリガー持ちのみを別途リストに格納
         have_trigger = [char for char in broken_life if not char.trigger_EF == []]
@@ -198,7 +250,7 @@ class Character(Cards):
                 ally_info, enemy_info = have_trigger.pop(num2).trigger_EF(ally_info,enemy_info)
         #ライフとして削られたカードを墓地に追加
         for char in broken_life:
-            enemy_info["trash"].append(char)
+            enemy_info["trash"].append(deepcopy(ally_info["origins"][char.No]))
         #ライフが0の場合に勝利判定
         if len(enemy_info["life"]) == 0:
             winner = 1 
@@ -209,7 +261,7 @@ class Character(Cards):
     #退場処理
     def void(self,ally_info,enemy_info,target_line,target_index):
         #該当のキャラクターを墓地に追加
-        ally_info["trash"].append(self)
+        ally_info["trash"].append(deepcopy(ally_info["origins"][self.No]))
         #場から削除
         ally_info[target_line][target_index] = None
         #退場時効果を発動
@@ -217,19 +269,72 @@ class Character(Cards):
             ally_info, enemy_info = func(ally_info,enemy_info)
         
         return ally_info, enemy_info
+    
+    #リムーブ処理
+    def remove(self,ally_info,enemy_info,target_line,target_index):
+        print("要検討")
 
-#呪術廻戦/黄/キャラクター
-JJK001 = Character("JJK001",None,["虎杖 悠仁"],"Yellow",0,1000)
-JJK006 = Character("JJK006",None,["釘崎 野薔薇"],"Yellow",0,1500)
-JJK016 = Character("JJK016",None,["パンダ"],"Yellow",3,3000,out_E=2)
-JJK024 = Character("JJK024",None,["玉犬:黒＆白"],"Yellow",0,2000,attribute=["式神"])
 
-#呪術廻戦/青/キャラクター
-JJK036 = Character("JJK036",None,["伊地知 潔高"],"Bule",0,1000) 
-JJK037 = Character("JJK037",None,["虎杖 悠仁"],"Blue",0,1500)
-JJK038 = Character("JJK038",None,["虎杖 悠仁"],"Blue",2,3000)
-JJK043 = Character("JJK043",None,["釘崎 野薔薇"],"Blue",0,1500)
+class Raid(Character):
+    def __init__(self,
+                 #基礎ステータス（入力任意）
+                 No,
+                 image,
+                 name,
+                 color,
+                 summon_E,
+                 BP,
 
-#呪術廻戦リスト
-Yellow_JJK = ["呪術廻戦/黄",JJK001,JJK006,JJK016,JJK024]
-Blue_JJK = ["呪術廻戦/青",JJK036,JJK037,JJK038,JJK043]
+                 #レイド専用要素
+                 raid_char,
+                 raid_EF,
+                 
+                 #基礎ステータス(入力任意)
+                 type="raid", 
+                 active=False,
+                 summon_AP=1, 
+                 out_E=1, 
+                 attribute=[],  
+                 damage=1, 
+                 under_card=[],
+                 
+                 #キーワード効果
+                 impact=0,
+                 unimpact=False, 
+                 step=False, 
+
+                 #カード効果
+                 trigger_EF=[], 
+                 hand_never_EF=[], 
+                 append_EF=[], 
+                 main_EF=[], 
+                 attack_EF=[], 
+                 block_EF=[], 
+                 void_EF=[], 
+                 line_never_EF=[]):
+        
+        super().__init__(No, image, name, color, summon_E, BP, type, active, summon_AP, out_E, attribute, damage, under_card, impact, unimpact, step, trigger_EF, hand_never_EF, append_EF, main_EF, attack_EF, block_EF, void_EF, line_never_EF)
+        self.raid_char = raid_char
+        self.raid_EF = raid_EF
+
+    def unpack_raid(self,list):
+        for char in list:
+            if char[0] == "append":
+                self.append_EF = char[1]
+            elif char[0] == "main":
+                self.main_EF = char[1]
+            elif char[0] == "attack":
+                self.attack_EF = char[1]
+            elif char[0] == "void":
+                self.void_EF = char[1]
+            elif char[0] == "trigger":
+                self.trigger_EF = char[1]
+            elif char[0] == "block":
+                self.block_EF = char[1]
+            elif char[0] == "line_never":
+                self.line_never_EF = char[1]
+    
+    def raid(self,ally_info,enemy_info,card_index,raid_line,raid_index,moved_line,moved_index):
+        self.unpack_raid(self.raid_EF)
+
+

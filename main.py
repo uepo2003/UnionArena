@@ -1,10 +1,9 @@
-from ginfo import *
-from deck_list import decks
+from class_list import *
 from random import *
-from log_class import GameLog
-from display import *
+from func_display import *
+from make_deck import *
 #ゲームボードの作成
-def make_bord(p1_name,player1_deck,p2_name,player2_deck):
+def make_bord(p1_name,player1_deck,p1_origin,p2_name,player2_deck,p2_origin):
     player1_info = {"player_name":p1_name,
                     "deck":player1_deck,
                     "front_line":[None,None,None,None],
@@ -14,6 +13,7 @@ def make_bord(p1_name,player1_deck,p2_name,player2_deck):
                     "trash":[],
                     "remove":[],
                     "observe":[],
+                    "origins":p1_origin,
                     "action_point":0}
 
     player2_info = {"player_name":p2_name,
@@ -25,6 +25,7 @@ def make_bord(p1_name,player1_deck,p2_name,player2_deck):
                     "trash":[],
                     "remove":[],
                     "observe":[],
+                    "origins":p2_origin,
                     "action_point":0}
     
     global log_maneger
@@ -178,7 +179,7 @@ def move_char(info,target_line,target_index,move_line,move_index):
                 return info
         #リムーブする場合
         elif choice == "1":
-            info["remove"].appned(move_char)
+            info["remove"].append(deepcopy(info["origins"][move_char.No]))
             print("リムーブしました。")
     #原則処理
     info[move_line][move_index] = target_char
@@ -209,10 +210,10 @@ def main_faze(ally_info,enemy_info):
         elif num == 1:
             #手札の一覧を表示→選ばれたカードを取得
             print(f"\n手札:{[[index,i.No] for index,i in enumerate(ally_info['hand'])]}")
-            num_1 = int(input("使用したいカードのインデックス番号を入力してください:"))
-            card = ally_info["hand"][num_1]
+            index_of_hand = int(input("使用したいカードのインデックス番号を入力してください:"))
+            card = ally_info["hand"][index_of_hand]
             #カード使用時の関数を実行
-            ally_info, enemy_info = use_card(ally_info,enemy_info,card,num_1)
+            ally_info, enemy_info = use_card(ally_info,enemy_info,card,index_of_hand)
         #場のカードの起動メインを実行
         elif num == 2:
             print("起動メインを使用したいカードの座標を確認します。")
@@ -230,7 +231,7 @@ def main_faze(ally_info,enemy_info):
                 continue
             #1個の場合
             elif len(target_card.main_EF) == 1:
-                ally_info, enemy_info = boot_main(ally_info,enemy_info,line,index,0)
+                ally_info, enemy_info = boot_main(ally_info,enemy_info,target_card,line,index,0)
             #複数個ある場合
             else:
                 #起動メインの一覧を表示し、選択させる
@@ -259,6 +260,55 @@ def use_card(ally_info,enemy_info,card,card_num):
         print("必要コストを満たしていません。召喚をキャンセルします。")
         return ally_info,enemy_info
     #カードタイプ毎に処理を分ける
+    #レイドカードの場合
+    if card.type == "raid":
+        raid_or_char = int(input("キャラクターとして召喚する場合は0を、レイドする場合は1を入力しください:\n"))
+        #キャラクターとしての処理
+        if raid_or_char == 0:
+            #召喚先の座標を取得
+            print("召喚先の座標を確認します。")
+            line,index = get_point()
+            #例外処理
+            #召喚先にカードが有る場合リムーブの確認を行う
+            if not ally_info[line][index] == None:
+                choice = input("召喚先にカードがあります。リムーブしますか？0か1で入力してください:")
+                #リムーブしない場合
+                if choice == "0":
+                    print("召喚をキャンセルします。")
+                    return ally_info,enemy_info
+                #リムーブする場合
+                elif choice == "1":
+                    ally_info["remove"].append(deepcopy(ally_info["origins"][ally_info[line][index].No]))
+                    ally_info[line][index] = None
+                    print("リムーブしました。")
+            #原則処理
+            ally_info, enemy_info = card.summon(ally_info,enemy_info,card_num,line,index)
+        #レイドとしての処理
+        if raid_or_char == 1:
+            #レイド先の座標を取得
+            print("レイドするキャタクターの座標を確認します。")
+            line,index = get_point()
+            #例外処理
+            #レイド可能なキャラクター以外もしくはNoneの場合
+            if not ally_info[line][index].name == card.raid_char:
+                print("レイド可能なキャラクターではありません。召喚をキャンセルします。")
+                return ally_info, enemy_info
+            #原則処理
+            else:
+                #レイド後の移動を処理
+                print("レイド後の移動先の座標を確認します。")
+                moved_line,moved_index = get_point()
+                #移動後の座標が同じではないかつNoneでもない＝リムーブが必要な場合の処理
+                if not (moved_line == line and moved_index == index) and not ally_info[moved_line][moved_index] == None:
+                    remove_or_not = int(input("移動先にカードが存在します。リムーブさせますか。0か1で入力してください:"))
+                    if remove_or_not == 0:
+                        print("召喚をキャンセルします。")
+                        return ally_info,enemy_info
+                    elif remove_or_not == 1:
+                        ally_info["remove"].append(ally_info[moved_line].pop(moved_index))
+                        ally_info[moved_line][moved_index] = None
+                ally_info, enemy_info = card.raid(ally_info,enemy_info,card_num,line,index,moved_line,moved_index)
+
     #キャラクターカードの場合
     if card.type == "char":
         #召喚先の座標を取得
@@ -274,11 +324,11 @@ def use_card(ally_info,enemy_info,card,card_num):
                 return ally_info,enemy_info
             #リムーブする場合
             elif choice == "1":
-                ally_info["remove"].append(ally_info[line][index])
+                ally_info["remove"].append(deepcopy(ally_info["origins"][ally_info[line][index].No]))
                 ally_info[line][index] = None
                 print("リムーブしました。")
         #原則処理
-        ally_info, enemy_info = card.use(ally_info,enemy_info,card_num,line,index)
+        ally_info, enemy_info = card.summon(ally_info,enemy_info,card_num,line,index)
     #フィールドカードの場合
     elif card.type == "field":
         #座標の取得
@@ -294,7 +344,7 @@ def use_card(ally_info,enemy_info,card,card_num):
                 return ally_info,enemy_info
             #リムーブする場合
             elif choice == "1":
-                ally_info["remove"].append(ally_info[line][index])
+                ally_info["remove"].append(deepcopy(ally_info["origins"][ally_info[line][index].No]))
                 ally_info[line][index] = None 
                 print("リムーブしました。")
         #原則処理
@@ -307,8 +357,8 @@ def use_card(ally_info,enemy_info,card,card_num):
     return ally_info, enemy_info
 
 #起動メインを使う
-def boot_main(ally_info,enemy_info,target_line,target_index,main_index):
-    ally_info, enemy_info = ally_info[target_line][target_index].EF[main_index][1](ally_info,enemy_info)
+def boot_main(ally_info,enemy_info,target_card,target_line,target_index,main_index):
+    ally_info, enemy_info = target_card.EF[main_index][1](ally_info,enemy_info)
     ally_info[target_line][target_index].EF[main_index][0] += 1
 
     return ally_info,enemy_info
@@ -356,19 +406,19 @@ def attack_faze(ally_info,enemy_info):
 def end_faze(info):
     #タイトルコール
     print(f"{split_faze}\n")
-    print("エンドフェイズ！")
+    print("<エンドフェイズ！>")
     #リフレッシュステップ
     for front_char in info["front_line"]:
         if front_char != None and front_char.active == False:
             front_char.active = True
             #同時に起動メインの使用回数をリセット
-            for effect in front_char.main_effect:
+            for effect in front_char.main_EF:
                 effect[0] = 0
     for energy_char in info["energy_line"]:
         if energy_char != None and energy_char.active == False:
             energy_char.active = True
             #同上
-            for effect in energy_char.main_effect:
+            for effect in energy_char.main_EF:
                 effect[0] = 0
     #手札が上限を超えている場合の処理
     #リムーブするカードを選択させて8枚以下になるまでループ
@@ -376,7 +426,8 @@ def end_faze(info):
         print("\n手札が8枚を超えています。リムーブするカードを選んでください。")
         print([[index,i.No] for index, i in info["hand"]])
         num = int(input("インデックス番号を入力してください:"))
-        info["remove"].append(info["hand"].pop(num))
+        info["remove"].append(deepcopy(info["origins"][info["hand"].pop(num).No]))
+
     
     input("\nエンドフェイズを終了します。キーを入力して下さい")
     return info
@@ -393,13 +444,17 @@ def get_point():
 
 #完成までは関数のテストに使用
 if __name__ == "__main__":
+    #デッキの読み込み
+    decks = load_deck_from_pickle('deck_list')
+    deck1,deck1_origin = unpack_deck(decks[0])
+    deck2,deck2_origin = unpack_deck(decks[1])
     #ゲームボードの作成
-    p1_info, p2_info= make_bord("Sitrus",decks[0],"Noel",decks[1])
+    p1_info, p2_info= make_bord("Sitrus",deck1,deck1_origin,"Noel",deck2,deck2_origin)
     #ターン数の制御変数を定義
     turn_num = 0
     counter = 0
     #勝利判定
-    winner = None 
+    winner = None
     loser = None
     #バトル準備
     p1_info = standby(p1_info)

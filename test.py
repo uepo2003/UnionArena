@@ -1,10 +1,9 @@
 "テスト用ファイル"
-from ginfo import *
+from class_list import *
 from copy import *
+from make_deck import *
 
-def test():
-    while True:
-        return "A"
-        
+testn = [[JJK006,2],[JJK001,2]]
+a,b = unpack_deck(testn)
+print(b)
 
-print(test())
